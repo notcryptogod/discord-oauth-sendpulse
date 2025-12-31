@@ -24,7 +24,7 @@ async function getSendPulseToken() {
   }
 }
 
-// Обновить переменные пользователя в SendPulse
+// Обновить переменные пользователя в SendPulse (через Telegram ID напрямую)
 async function updateSendPulseVariables(telegramId, discordUsername, discordId) {
   try {
     const token = await getSendPulseToken();
@@ -33,14 +33,19 @@ async function updateSendPulseVariables(telegramId, discordUsername, discordId) 
       return false;
     }
 
-    // Обновляем discord_username (telegramId как строка!)
-    const response1 = await axios.post(
-      `https://api.sendpulse.com/telegram/contacts/setVariable`,
+    console.log('🔄 Updating variables for telegram user:', telegramId);
+
+    // Используем другой endpoint - обновление через external_id (Telegram ID)
+    const response = await axios.post(
+      `https://api.sendpulse.com/telegram/contacts/setVariableByExternalId`,
       {
-        contact_id: String(telegramId),
+        external_id: String(telegramId),
         bot_id: SENDPULSE_BOT_ID,
-        variable_name: 'discord_username',
-        variable_value: discordUsername
+        variables: {
+          discord_username: discordUsername,
+          discord_id: discordId,
+          discord_linked: 'true'
+        }
       },
       {
         headers: {
@@ -50,50 +55,94 @@ async function updateSendPulseVariables(telegramId, discordUsername, discordId) 
       }
     );
 
-    console.log('✅ discord_username updated:', response1.data);
-
-    // Обновляем discord_id
-    await axios.post(
-      `https://api.sendpulse.com/telegram/contacts/setVariable`,
-      {
-        contact_id: String(telegramId),
-        bot_id: SENDPULSE_BOT_ID,
-        variable_name: 'discord_id',
-        variable_value: discordId
-      },
-      {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      }
-    );
-
-    console.log('✅ discord_id updated');
-
-    // Обновляем discord_linked
-    await axios.post(
-      `https://api.sendpulse.com/telegram/contacts/setVariable`,
-      {
-        contact_id: String(telegramId),
-        bot_id: SENDPULSE_BOT_ID,
-        variable_name: 'discord_linked',
-        variable_value: 'true'
-      },
-      {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      }
-    );
-
-    console.log('✅ discord_linked updated');
-
+    console.log('✅ SendPulse variables updated:', response.data);
     return true;
+
   } catch (error) {
     console.error('❌ SendPulse update error:', error.response?.data || error.message);
-    return false;
+    
+    // Попробуем альтернативный метод - через getByExternalId и затем setVariable
+    try {
+      const token = await getSendPulseToken();
+      
+      // Получаем contact_id по telegram_id
+      const getResponse = await axios.get(
+        `https://api.sendpulse.com/telegram/contacts/getByExternalId`,
+        {
+          params: {
+            external_id: String(telegramId),
+            bot_id: SENDPULSE_BOT_ID
+          },
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
+
+      if (getResponse.data && getResponse.data.data && getResponse.data.data.id) {
+        const contactId = getResponse.data.data.id;
+        console.log('✅ Found contact_id:', contactId);
+
+        // Теперь обновляем переменные по найденному contact_id
+        await axios.post(
+          `https://api.sendpulse.com/telegram/contacts/setVariable`,
+          {
+            contact_id: String(contactId),
+            bot_id: SENDPULSE_BOT_ID,
+            variable_name: 'discord_username',
+            variable_value: discordUsername
+          },
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+
+        await axios.post(
+          `https://api.sendpulse.com/telegram/contacts/setVariable`,
+          {
+            contact_id: String(contactId),
+            bot_id: SENDPULSE_BOT_ID,
+            variable_name: 'discord_id',
+            variable_value: discordId
+          },
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+
+        await axios.post(
+          `https://api.sendpulse.com/telegram/contacts/setVariable`,
+          {
+            contact_id: String(contactId),
+            bot_id: SENDPULSE_BOT_ID,
+            variable_name: 'discord_linked',
+            variable_value: 'true'
+          },
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+
+        console.log('✅ Variables updated via alternative method');
+        return true;
+      } else {
+        console.error('❌ Contact not found by external_id');
+        return false;
+      }
+
+    } catch (altError) {
+      console.error('❌ Alternative method also failed:', altError.response?.data || altError.message);
+      return false;
+    }
   }
 }
 
