@@ -5,7 +5,6 @@ const redis = new Redis({
   token: process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN,
 });
 
-// Очистка старых state токенов (старше 30 минут)
 export async function cleanupOldStates() {
   try {
     const stateKeys = await redis.keys('state:*');
@@ -15,7 +14,7 @@ export async function cleanupOldStates() {
       const data = await redis.get(key);
       if (data && data.created_at) {
         const createdAt = new Date(data.created_at).getTime();
-        if (now - createdAt > 30 * 60 * 1000) { // 30 минут вместо 10
+        if (now - createdAt > 30 * 60 * 1000) {
           await redis.del(key);
         }
       }
@@ -25,10 +24,9 @@ export async function cleanupOldStates() {
   }
 }
 
-// Получить Discord username по telegram_id
-export async function getDiscordUsername(telegramId) {
+export async function getDiscordUsername(contactId) {
   try {
-    const user = await redis.get(`user:${telegramId}`);
+    const user = await redis.get(`user:${contactId}`);
     return user ? user.discord_username : null;
   } catch (error) {
     console.error('Get username error:', error);
@@ -36,36 +34,33 @@ export async function getDiscordUsername(telegramId) {
   }
 }
 
-// Сохранить Discord данные
-export async function saveDiscordData(telegramId, discordUsername, discordId) {
+export async function saveDiscordData(contactId, discordUsername, discordId) {
   try {
-    await redis.set(`user:${telegramId}`, {
-      telegram_id: telegramId,
+    await redis.set(`user:${contactId}`, {
+      contact_id: contactId,
       discord_username: discordUsername,
       discord_id: discordId,
       created_at: new Date().toISOString()
     });
-    console.log('✅ Saved to Redis:', { telegramId, discordUsername });
+    console.log('✅ Saved to Redis:', { contactId, discordUsername });
   } catch (error) {
     console.error('Save data error:', error);
   }
 }
 
-// Создать state токен (увеличено время жизни до 30 минут)
-export async function createState(telegramId, state) {
+export async function createState(contactId, state) {
   try {
     await redis.set(`state:${state}`, {
-      telegram_id: telegramId,
+      contact_id: contactId,
       created_at: new Date().toISOString()
-    }, { ex: 1800 }); // 1800 секунд = 30 минут
-    console.log('✅ State created:', { state, telegramId });
+    }, { ex: 1800 });
+    console.log('✅ State created:', { state, contactId });
   } catch (error) {
     console.error('Create state error:', error);
   }
 }
 
-// Получить telegram_id по state и удалить state
-export async function getTelegramIdByState(state) {
+export async function getContactIdByState(state) {
   try {
     console.log('🔍 Looking up state:', state);
     const data = await redis.get(`state:${state}`);
@@ -74,7 +69,7 @@ export async function getTelegramIdByState(state) {
     if (data) {
       await redis.del(`state:${state}`);
       console.log('✅ State deleted after use');
-      return data.telegram_id;
+      return data.contact_id;
     }
     
     console.log('❌ State not found in Redis');
