@@ -4,6 +4,62 @@ import { getTelegramIdByState, saveDiscordData } from './db.js';
 const DISCORD_CLIENT_ID = '1455322635859791892';
 const DISCORD_CLIENT_SECRET = 'mTnsjqlCHggqNe6Z3ovr7aDnX3KHZqjn';
 
+// SendPulse API credentials
+const SENDPULSE_API_ID = '9b986040f37e4debcf0158442c479099';
+const SENDPULSE_API_SECRET = '341b6af94133dc65e68fd762a74e5985';
+const SENDPULSE_BOT_ID = '68f0ea664be776c8aa0197e9';
+
+// Получить SendPulse access token
+async function getSendPulseToken() {
+  try {
+    const response = await axios.post('https://api.sendpulse.com/oauth/access_token', {
+      grant_type: 'client_credentials',
+      client_id: SENDPULSE_API_ID,
+      client_secret: SENDPULSE_API_SECRET
+    });
+    return response.data.access_token;
+  } catch (error) {
+    console.error('SendPulse token error:', error.response?.data || error.message);
+    return null;
+  }
+}
+
+// Обновить переменные пользователя в SendPulse
+async function updateSendPulseVariables(telegramId, discordUsername, discordId) {
+  try {
+    const token = await getSendPulseToken();
+    if (!token) {
+      console.error('Failed to get SendPulse token');
+      return false;
+    }
+
+    const response = await axios.post(
+      `https://api.sendpulse.com/telegram/contacts/setVariables`,
+      {
+        contact_id: parseInt(telegramId),
+        bot_id: SENDPULSE_BOT_ID,
+        variables: {
+          discord_username: discordUsername,
+          discord_id: discordId,
+          discord_linked: 'true'
+        }
+      },
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    console.log('✅ SendPulse variables updated:', response.data);
+    return true;
+  } catch (error) {
+    console.error('❌ SendPulse update error:', error.response?.data || error.message);
+    return false;
+  }
+}
+
 export default async function handler(req, res) {
   const { code, state } = req.query;
   const baseUrl = `https://${req.headers.host}`;
@@ -16,7 +72,7 @@ export default async function handler(req, res) {
     return res.status(400).send(errorPage('Отсутствует код или state токен'));
   }
   
-  const telegramId = getTelegramIdByState(state);
+  const telegramId = await getTelegramIdByState(state);
   
   if (!telegramId) {
     console.error('State lookup failed');
@@ -57,8 +113,18 @@ export default async function handler(req, res) {
     console.log('✅ User data received:', discordUsername);
     
     // Сохранение в БД
-    saveDiscordData(telegramId, discordUsername, discordId);
+    await saveDiscordData(telegramId, discordUsername, discordId);
     console.log('✅ Data saved to database');
+    
+    // Отправка данных в SendPulse
+    console.log('🔄 Updating SendPulse variables...');
+    const sendpulseSuccess = await updateSendPulseVariables(telegramId, discordUsername, discordId);
+    
+    if (sendpulseSuccess) {
+      console.log('✅ SendPulse updated successfully');
+    } else {
+      console.log('⚠️ SendPulse update failed (but Discord data saved)');
+    }
     
     // Страница успеха
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
@@ -175,19 +241,12 @@ function successPage(username, telegramId) {
           margin-top: 20px;
           opacity: 0.9;
         }
-        .back-btn {
-          display: inline-block;
+        .info {
+          font-size: 14px;
           margin-top: 30px;
-          padding: 15px 30px;
-          background: white;
-          color: #667eea;
-          text-decoration: none;
+          padding: 15px;
+          background: rgba(255,255,255,0.1);
           border-radius: 10px;
-          font-weight: bold;
-          transition: transform 0.3s;
-        }
-        .back-btn:hover {
-          transform: scale(1.05);
         }
       </style>
     </head>
@@ -196,10 +255,10 @@ function successPage(username, telegramId) {
         <div class="check">✅</div>
         <h1>Discord успешно привязан!</h1>
         <div class="username">${username}</div>
-        <p>Теперь вернитесь в Telegram 🚀</p>
-        <a href="/cabinet?telegram_id=${telegramId}" class="back-btn">
-          ← Вернуться в кабинет
-        </a>
+        <p>Данные автоматически сохранены в SendPulse!</p>
+        <div class="info">
+          Вернитесь в Telegram и откройте личный кабинет снова 🚀
+        </div>
       </div>
     </body>
     </html>
