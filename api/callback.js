@@ -26,8 +26,7 @@ async function updateSendPulseVariables(contactId, discordUsername, discordId) {
   try {
     const token = await getSendPulseToken();
     if (!token) {
-      console.error('Failed to get SendPulse token');
-      return false;
+      throw new Error('Failed to get SendPulse token');
     }
 
     console.log('🔄 Updating SendPulse for contact_id:', contactId);
@@ -69,7 +68,7 @@ async function updateSendPulseVariables(contactId, discordUsername, discordId) {
 
   } catch (error) {
     console.error('❌ SendPulse update error:', error.response?.data || error.message);
-    return false;
+    throw error;
   }
 }
 
@@ -77,8 +76,7 @@ async function sendTelegramMessage(contactId) {
   try {
     const token = await getSendPulseToken();
     if (!token) {
-      console.error('Failed to get SendPulse token');
-      return false;
+      throw new Error('Failed to get SendPulse token');
     }
 
     console.log('🔄 Sending message to contact_id:', contactId);
@@ -103,16 +101,28 @@ async function sendTelegramMessage(contactId) {
 
   } catch (error) {
     console.error('❌ Send message error:', error.response?.data || error.message);
+    // Не бросаем ошибку, т.к. сообщение не критично
     return false;
   }
 }
 
 export default async function handler(req, res) {
-  const { code, state } = req.query;
+  const { code, state, error, error_description } = req.query;
   const baseUrl = `https://${req.headers.host}`;
   const redirectUri = `${baseUrl}/discord/callback`;
   
   console.log('📥 Callback received');
+  
+  // Проверка: Discord вернул ошибку
+  if (error) {
+    console.error('Discord OAuth error:', error, error_description);
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    return res.status(400).send(errorPage(
+      error === 'access_denied' 
+        ? 'Вы отменили авторизацию Discord. Попробуйте снова.' 
+        : `Ошибка Discord: ${error_description || error}`
+    ));
+  }
   
   if (!code || !state) {
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
@@ -129,6 +139,8 @@ export default async function handler(req, res) {
   
   console.log('✅ State valid for contact_id:', contactId);
   
+  let discordUsername = '';
+  
   try {
     console.log('🔄 Exchanging code for token...');
     const tokenResponse = await axios.post(
@@ -141,7 +153,8 @@ export default async function handler(req, res) {
         redirect_uri: redirectUri
       }),
       {
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        timeout: 10000
       }
     );
     
@@ -150,29 +163,45 @@ export default async function handler(req, res) {
     
     console.log('🔄 Fetching user data...');
     const userResponse = await axios.get('https://discord.com/api/users/@me', {
-      headers: { 'Authorization': `Bearer ${accessToken}` }
+      headers: { 'Authorization': `Bearer ${accessToken}` },
+      timeout: 10000
     });
     
-    const discordUsername = userResponse.data.username;
+    discordUsername = userResponse.data.username;
     const discordId = userResponse.data.id;
     console.log('✅ User data received:', discordUsername);
     
+    console.log('🔄 Saving to database...');
     await saveDiscordData(contactId, discordUsername, discordId);
     console.log('✅ Data saved to database');
     
     console.log('🔄 Updating SendPulse variables...');
     await updateSendPulseVariables(contactId, discordUsername, discordId);
+    console.log('✅ SendPulse variables updated');
     
-    console.log('🔄 Sending Telegram message...');
+    // ВСЁ УСПЕШНО! Теперь отправляем сообщение
+    console.log('🔄 Sending success message...');
     await sendTelegramMessage(contactId);
+    console.log('✅ Success message sent');
     
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.status(200).send(successLandingPage(discordUsername));
     
   } catch (error) {
     console.error('❌ OAuth error:', error.response?.data || error.message);
+    
+    let errorMessage = 'Произошла ошибка при привязке Discord. Попробуйте снова.';
+    
+    if (error.code === 'ECONNABORTED') {
+      errorMessage = 'Превышено время ожидания. Попробуйте снова.';
+    } else if (error.response?.data?.error === 'invalid_grant') {
+      errorMessage = 'Код авторизации истёк. Попробуйте снова.';
+    } else if (error.response?.status === 401) {
+      errorMessage = 'Ошибка авторизации Discord. Попробуйте снова.';
+    }
+    
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.status(500).send(errorPage(`Ошибка OAuth: ${error.message}`));
+    res.status(500).send(errorPage(errorMessage));
   }
 }
 
