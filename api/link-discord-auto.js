@@ -26,13 +26,12 @@ async function findContactIdByTelegramId(telegramId) {
     const token = await getSendPulseToken();
     if (!token) return null;
 
-    // Получаем список контактов бота
     const response = await axios.get(
       `https://api.sendpulse.com/telegram/contacts`,
       {
         params: {
           bot_id: SENDPULSE_BOT_ID,
-          limit: 500
+          limit: 100
         },
         headers: {
           'Authorization': `Bearer ${token}`
@@ -40,9 +39,8 @@ async function findContactIdByTelegramId(telegramId) {
       }
     );
 
-    // Ищем контакт по telegram_user_id
     const contacts = response.data?.data || [];
-    const contact = contacts.find(c => c.telegram_user_id === parseInt(telegramId));
+    const contact = contacts.find(c => c.telegram_id === parseInt(telegramId));
     
     if (contact) {
       console.log('✅ Found contact_id:', contact.id, 'for telegram_id:', telegramId);
@@ -68,7 +66,6 @@ export default async function handler(req, res) {
   
   console.log('📥 Auto-linking request for telegram_id:', telegramId);
   
-  // Находим Contact ID по Telegram ID
   const contactId = await findContactIdByTelegramId(telegramId);
   
   if (!contactId) {
