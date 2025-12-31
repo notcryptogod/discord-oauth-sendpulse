@@ -1,0 +1,73 @@
+{
+  "name": "discord-oauth-sendpulse",
+  "version": "1.0.0",
+  "description": "Discord OAuth для SendPulse бота",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "axios": "^1.6.7",
+    "sqlite3": "^5.1.7"
+  },
+  "engines": {
+    "node": "18.x"
+  }
+}
+```
+
+4. **Commit changes**
+
+---
+
+### Шаг 2.4: Создайте `.gitignore`
+
+1. **"Add file"** → **"Create new file"**
+2. Имя: `.gitignore`
+3. Код:
+```
+node_modules/
+data/
+*.db
+.env
+```
+
+4. **Commit changes**
+
+---
+
+# ☁️ ЭТАП 3: ДЕПЛОЙ НА RAILWAY
+
+### Шаг 3.1: Зарегистрируйтесь на Railway
+
+1. Откройте: https://railway.app
+2. Нажмите **"Login"**
+3. Выберите **"Login with GitHub"**
+4. Авторизуйтесь
+
+---
+
+### Шаг 3.2: Создайте новый проект
+
+1. После входа нажмите **"New Project"**
+2. Выберите **"Deploy from GitHub repo"**
+3. Выберите репозиторий **`discord-oauth-sendpulse`**
+4. Нажмите **"Deploy Now"**
+
+Railway начнёт деплой автоматически.
+
+---
+
+### Шаг 3.3: Добавьте переменные окружения
+
+1. Кликните на ваш сервис (название репозитория)
+2. Перейдите на вкладку **"Variables"**
+3. Нажмите **"+ New Variable"**
+4. Добавьте 2 переменные:
+```
+DISCORD_CLIENT_ID
+(вставьте ваш Client ID без кавычек)
+
+DISCORD_CLIENT_SECRET
+(вставьте ваш Client Secret без кавычек)
