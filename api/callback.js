@@ -60,6 +60,40 @@ async function updateSendPulseVariables(telegramId, discordUsername, discordId) 
   }
 }
 
+// Отправить сообщение пользователю через SendPulse
+async function sendSuccessMessage(telegramId, discordUsername) {
+  try {
+    const token = await getSendPulseToken();
+    if (!token) {
+      console.error('Failed to get SendPulse token');
+      return false;
+    }
+
+    const response = await axios.post(
+      `https://api.sendpulse.com/telegram/contacts/sendMessage`,
+      {
+        contact_id: parseInt(telegramId),
+        bot_id: SENDPULSE_BOT_ID,
+        message: {
+          text: `✅ Discord успешно привязан!\n\n🎮 Ваш Discord: ${discordUsername}\n\nТеперь вы можете перейти в личный кабинет и продолжить работу с ботом.`
+        }
+      },
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    console.log('✅ Success message sent:', response.data);
+    return true;
+  } catch (error) {
+    console.error('❌ Send message error:', error.response?.data || error.message);
+    return false;
+  }
+}
+
 export default async function handler(req, res) {
   const { code, state } = req.query;
   const baseUrl = `https://${req.headers.host}`;
@@ -118,23 +152,116 @@ export default async function handler(req, res) {
     
     // Отправка данных в SendPulse
     console.log('🔄 Updating SendPulse variables...');
-    const sendpulseSuccess = await updateSendPulseVariables(telegramId, discordUsername, discordId);
+    await updateSendPulseVariables(telegramId, discordUsername, discordId);
     
-    if (sendpulseSuccess) {
-      console.log('✅ SendPulse updated successfully');
-    } else {
-      console.log('⚠️ SendPulse update failed (but Discord data saved)');
-    }
+    // Отправка сообщения в Telegram
+    console.log('🔄 Sending success message...');
+    await sendSuccessMessage(telegramId, discordUsername);
     
-    // Страница успеха
+    // Ваш лендинг с редиректом
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.status(200).send(successPage(discordUsername, telegramId));
+    res.status(200).send(successLandingPage(discordUsername));
     
   } catch (error) {
     console.error('❌ OAuth error:', error.response?.data || error.message);
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.status(500).send(errorPage(`Ошибка OAuth: ${error.message}`));
   }
+}
+
+function successLandingPage(discordUsername) {
+  return `<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Discord успешно привязан</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="
+  margin:0;
+  padding:0;
+  background:#000;
+  color:#fff;
+  width:100%;
+  height:100vh;
+  font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+">
+  <div style="
+    text-align:center;
+    padding:0 20px;
+    max-width:520px;
+    transform: translateY(-20px);
+  ">
+    <!-- SVG галочка -->
+    <svg width="70" height="55" viewBox="0 0 180 140" fill="none"
+         xmlns="http://www.w3.org/2000/svg"
+         style="margin-bottom:18px;"
+         class="checkmark">
+      <defs>
+        <filter id="glow">
+          <feGaussianBlur stdDeviation="6" result="coloredBlur"/>
+          <feMerge>
+            <feMergeNode in="coloredBlur"/>
+            <feMergeNode in="SourceGraphic"/>
+          </feMerge>
+        </filter>
+      </defs>
+      <path
+        d="M20 75 L70 120 L160 20"
+        stroke="#CCFB55"
+        stroke-width="14"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        fill="none"
+        filter="url(#glow)"
+        class="check-path"
+      />
+    </svg>
+    <div style="font-size:20px;font-weight:700;margin-bottom:10px;">
+      Discord успешно привязан
+    </div>
+    <div style="font-size:15px;opacity:0.9;margin-bottom:22px;">
+      Сейчас вы будете автоматически<br>
+      перенаправлены в Telegram
+    </div>
+    <a href="https://t.me/notcryptogodxbot" id="tg-link"
+       style="
+         display:inline-block;
+         background:#CCFB55;
+         color:#000;
+         text-decoration:none;
+         font-size:14px;
+         font-weight:600;
+         padding:10px 18px;
+         border-radius:14px;
+       ">
+      Открыть Telegram
+    </a>
+  </div>
+  <style>
+    .check-path {
+      stroke-dasharray: 260;
+      stroke-dashoffset: 260;
+      animation: drawCheck 0.9s ease-out forwards,
+                 bounceCheck 0.4s ease-out 0.9s forwards;
+    }
+    @keyframes drawCheck { to { stroke-dashoffset: 0; } }
+    @keyframes bounceCheck {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.08); }
+      100% { transform: scale(1); }
+    }
+  </style>
+  <script>
+    setTimeout(() => {
+      window.location.replace('https://t.me/notcryptogodxbot');
+    }, 2500);
+  </script>
+</body>
+</html>`;
 }
 
 function errorPage(message) {
@@ -172,93 +299,6 @@ function errorPage(message) {
       <div class="container">
         <h1>❌ Ошибка</h1>
         <p>${message}</p>
-      </div>
-    </body>
-    </html>
-  `;
-}
-
-function successPage(username, telegramId) {
-  return `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="utf-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1">
-      <title>Успешно!</title>
-      <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          min-height: 100vh;
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          color: white;
-          padding: 20px;
-        }
-        .container {
-          text-align: center;
-          background: rgba(255,255,255,0.1);
-          padding: 50px 40px;
-          border-radius: 20px;
-          backdrop-filter: blur(10px);
-          max-width: 500px;
-          width: 100%;
-          animation: slideIn 0.5s ease-out;
-        }
-        @keyframes slideIn {
-          from { transform: translateY(-50px); opacity: 0; }
-          to { transform: translateY(0); opacity: 1; }
-        }
-        .check {
-          font-size: 80px;
-          margin-bottom: 20px;
-          animation: bounce 1s ease-in-out;
-        }
-        @keyframes bounce {
-          0%, 100% { transform: scale(1); }
-          50% { transform: scale(1.1); }
-        }
-        h1 { 
-          font-size: 32px;
-          margin-bottom: 20px;
-        }
-        .username {
-          font-size: 28px;
-          font-weight: bold;
-          margin: 30px 0;
-          color: #5865F2;
-          background: white;
-          padding: 20px;
-          border-radius: 15px;
-          box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-          word-break: break-word;
-        }
-        p {
-          font-size: 18px;
-          margin-top: 20px;
-          opacity: 0.9;
-        }
-        .info {
-          font-size: 14px;
-          margin-top: 30px;
-          padding: 15px;
-          background: rgba(255,255,255,0.1);
-          border-radius: 10px;
-        }
-      </style>
-    </head>
-    <body>
-      <div class="container">
-        <div class="check">✅</div>
-        <h1>Discord успешно привязан!</h1>
-        <div class="username">${username}</div>
-        <p>Данные автоматически сохранены в SendPulse!</p>
-        <div class="info">
-          Вернитесь в Telegram и откройте личный кабинет снова 🚀
-        </div>
       </div>
     </body>
     </html>
