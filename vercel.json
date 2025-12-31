@@ -5,6 +5,7 @@
     { "source": "/start-oauth", "destination": "/api/start-oauth" },
     { "source": "/link-discord", "destination": "/api/link-discord-auto" },
     { "source": "/check-discord", "destination": "/api/check-discord" },
+    { "source": "/debug-contacts", "destination": "/api/debug-contacts" },
     { "source": "/discord/callback", "destination": "/api/callback" }
   ]
 }
