@@ -1,0 +1,9 @@
+{
+  "rewrites": [
+    { "source": "/", "destination": "/api/index" },
+    { "source": "/cabinet", "destination": "/api/cabinet" },
+    { "source": "/start-oauth", "destination": "/api/start-oauth" },
+    { "source": "/check-discord", "destination": "/api/check-discord" },
+    { "source": "/discord/callback", "destination": "/api/callback" }
+  ]
+}
