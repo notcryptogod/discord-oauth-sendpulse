@@ -73,7 +73,7 @@ async function updateSendPulseVariables(contactId, discordUsername, discordId) {
   }
 }
 
-async function triggerA360Event(contactId) {
+async function sendTelegramMessage(contactId) {
   try {
     const token = await getSendPulseToken();
     if (!token) {
@@ -81,12 +81,14 @@ async function triggerA360Event(contactId) {
       return false;
     }
 
-    console.log('🔄 Triggering A360 event for contact_id:', contactId);
+    console.log('🔄 Sending message to contact_id:', contactId);
 
     const response = await axios.post(
-      `https://events.sendpulse.com/events/name/discord_linked`,
+      `https://api.sendpulse.com/telegram/contacts/sendText`,
       {
-        contact_id: contactId
+        contact_id: contactId,
+        bot_id: SENDPULSE_BOT_ID,
+        text: '✅ Discord успешно привязан!\n\nТеперь вы можете перейти в личный кабинет и продолжить работу с ботом.'
       },
       {
         headers: {
@@ -96,11 +98,11 @@ async function triggerA360Event(contactId) {
       }
     );
 
-    console.log('✅ A360 event triggered:', response.data);
+    console.log('✅ Message sent successfully:', response.data);
     return true;
 
   } catch (error) {
-    console.error('❌ A360 event error:', error.response?.data || error.message);
+    console.error('❌ Send message error:', error.response?.data || error.message);
     return false;
   }
 }
@@ -161,8 +163,8 @@ export default async function handler(req, res) {
     console.log('🔄 Updating SendPulse variables...');
     await updateSendPulseVariables(contactId, discordUsername, discordId);
     
-    console.log('🔄 Triggering A360 event...');
-    await triggerA360Event(contactId);
+    console.log('🔄 Sending Telegram message...');
+    await sendTelegramMessage(contactId);
     
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.status(200).send(successLandingPage(discordUsername));
