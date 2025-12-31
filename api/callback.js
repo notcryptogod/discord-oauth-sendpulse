@@ -73,6 +73,38 @@ async function updateSendPulseVariables(contactId, discordUsername, discordId) {
   }
 }
 
+async function triggerA360Event(contactId) {
+  try {
+    const token = await getSendPulseToken();
+    if (!token) {
+      console.error('Failed to get SendPulse token');
+      return false;
+    }
+
+    console.log('🔄 Triggering A360 event for contact_id:', contactId);
+
+    const response = await axios.post(
+      `https://events.sendpulse.com/events/name/discord_linked`,
+      {
+        contact_id: contactId
+      },
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    console.log('✅ A360 event triggered:', response.data);
+    return true;
+
+  } catch (error) {
+    console.error('❌ A360 event error:', error.response?.data || error.message);
+    return false;
+  }
+}
+
 export default async function handler(req, res) {
   const { code, state } = req.query;
   const baseUrl = `https://${req.headers.host}`;
@@ -128,6 +160,9 @@ export default async function handler(req, res) {
     
     console.log('🔄 Updating SendPulse variables...');
     await updateSendPulseVariables(contactId, discordUsername, discordId);
+    
+    console.log('🔄 Triggering A360 event...');
+    await triggerA360Event(contactId);
     
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.status(200).send(successLandingPage(discordUsername));
