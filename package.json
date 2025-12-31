@@ -3,23 +3,8 @@
   "version": "1.0.0",
   "description": "Discord OAuth integration for SendPulse Telegram bot",
   "type": "module",
-  "scripts": {
-    "dev": "vercel dev"
-  },
-  "keywords": [
-    "discord",
-    "oauth",
-    "telegram",
-    "sendpulse",
-    "bot"
-  ],
-  "author": "notcryptogod",
-  "license": "MIT",
   "dependencies": {
     "axios": "^1.6.7",
-    "better-sqlite3": "^9.2.2"
-  },
-  "devDependencies": {
-    "vercel": "^33.0.1"
+    "@upstash/redis": "^1.28.0"
   }
 }
