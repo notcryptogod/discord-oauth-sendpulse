@@ -33,11 +33,11 @@ async function updateSendPulseVariables(telegramId, discordUsername, discordId) 
       return false;
     }
 
-    // Обновляем discord_username
+    // Обновляем discord_username (telegramId как строка!)
     const response1 = await axios.post(
       `https://api.sendpulse.com/telegram/contacts/setVariable`,
       {
-        contact_id: parseInt(telegramId),
+        contact_id: String(telegramId),
         bot_id: SENDPULSE_BOT_ID,
         variable_name: 'discord_username',
         variable_value: discordUsername
@@ -56,7 +56,7 @@ async function updateSendPulseVariables(telegramId, discordUsername, discordId) 
     await axios.post(
       `https://api.sendpulse.com/telegram/contacts/setVariable`,
       {
-        contact_id: parseInt(telegramId),
+        contact_id: String(telegramId),
         bot_id: SENDPULSE_BOT_ID,
         variable_name: 'discord_id',
         variable_value: discordId
@@ -75,7 +75,7 @@ async function updateSendPulseVariables(telegramId, discordUsername, discordId) 
     await axios.post(
       `https://api.sendpulse.com/telegram/contacts/setVariable`,
       {
-        contact_id: parseInt(telegramId),
+        contact_id: String(telegramId),
         bot_id: SENDPULSE_BOT_ID,
         variable_name: 'discord_linked',
         variable_value: 'true'
