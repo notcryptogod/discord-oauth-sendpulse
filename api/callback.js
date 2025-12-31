@@ -33,16 +33,14 @@ async function updateSendPulseVariables(telegramId, discordUsername, discordId) 
       return false;
     }
 
+    // Используем правильный endpoint для обновления переменных
     const response = await axios.post(
-      `https://api.sendpulse.com/telegram/contacts/setVariables`,
+      `https://api.sendpulse.com/telegram/contacts/setVariable`,
       {
         contact_id: parseInt(telegramId),
         bot_id: SENDPULSE_BOT_ID,
-        variables: {
-          discord_username: discordUsername,
-          discord_id: discordId,
-          discord_linked: 'true'
-        }
+        variable_name: 'discord_username',
+        variable_value: discordUsername
       },
       {
         headers: {
@@ -52,7 +50,46 @@ async function updateSendPulseVariables(telegramId, discordUsername, discordId) 
       }
     );
 
-    console.log('✅ SendPulse variables updated:', response.data);
+    console.log('✅ discord_username updated:', response.data);
+
+    // Обновляем discord_id
+    await axios.post(
+      `https://api.sendpulse.com/telegram/contacts/setVariable`,
+      {
+        contact_id: parseInt(telegramId),
+        bot_id: SENDPULSE_BOT_ID,
+        variable_name: 'discord_id',
+        variable_value: discordId
+      },
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    console.log('✅ discord_id updated');
+
+    // Обновляем discord_linked
+    await axios.post(
+      `https://api.sendpulse.com/telegram/contacts/setVariable`,
+      {
+        contact_id: parseInt(telegramId),
+        bot_id: SENDPULSE_BOT_ID,
+        variable_name: 'discord_linked',
+        variable_value: 'true'
+      },
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    console.log('✅ discord_linked updated');
+
     return true;
   } catch (error) {
     console.error('❌ SendPulse update error:', error.response?.data || error.message);
@@ -69,14 +106,13 @@ async function sendSuccessMessage(telegramId, discordUsername) {
       return false;
     }
 
+    // Используем правильный endpoint для отправки сообщений
     const response = await axios.post(
-      `https://api.sendpulse.com/telegram/contacts/sendMessage`,
+      `https://api.sendpulse.com/telegram/contacts/send`,
       {
         contact_id: parseInt(telegramId),
         bot_id: SENDPULSE_BOT_ID,
-        message: {
-          text: `✅ Discord успешно привязан!\n\n🎮 Ваш Discord: ${discordUsername}\n\nТеперь вы можете перейти в личный кабинет и продолжить работу с ботом.`
-        }
+        message_text: `✅ Discord успешно привязан!\n\n🎮 Ваш Discord: ${discordUsername}\n\nТеперь вы можете перейти в личный кабинет и продолжить работу с ботом.`
       },
       {
         headers: {
@@ -90,6 +126,7 @@ async function sendSuccessMessage(telegramId, discordUsername) {
     return true;
   } catch (error) {
     console.error('❌ Send message error:', error.response?.data || error.message);
+    // Продолжаем даже если отправка сообщения не удалась
     return false;
   }
 }
@@ -99,7 +136,11 @@ export default async function handler(req, res) {
   const baseUrl = `https://${req.headers.host}`;
   const redirectUri = `${baseUrl}/discord/callback`;
   
-  console.log('📥 Callback received:', { code: code ? 'present' : 'missing', state: state ? 'present' : 'missing' });
+  console.log('📥 Callback received:', { 
+    code: code ? 'present' : 'missing', 
+    state: state ? 'present' : 'missing',
+    stateValue: state 
+  });
   
   if (!code || !state) {
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
@@ -109,7 +150,7 @@ export default async function handler(req, res) {
   const telegramId = await getTelegramIdByState(state);
   
   if (!telegramId) {
-    console.error('State lookup failed');
+    console.error('State lookup failed for state:', state);
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     return res.status(400).send(errorPage('Неверный state токен. Попробуйте начать заново.'));
   }
@@ -144,17 +185,23 @@ export default async function handler(req, res) {
     
     const discordUsername = userResponse.data.username;
     const discordId = userResponse.data.id;
-    console.log('✅ User data received:', discordUsername);
+    console.log('✅ User data received:', discordUsername, 'ID:', discordId);
     
     // Сохранение в БД
     await saveDiscordData(telegramId, discordUsername, discordId);
     console.log('✅ Data saved to database');
     
     // Отправка данных в SendPulse
-    console.log('🔄 Updating SendPulse variables...');
-    await updateSendPulseVariables(telegramId, discordUsername, discordId);
+    console.log('🔄 Updating SendPulse variables for telegram_id:', telegramId);
+    const updateSuccess = await updateSendPulseVariables(telegramId, discordUsername, discordId);
     
-    // Отправка сообщения в Telegram
+    if (updateSuccess) {
+      console.log('✅ SendPulse variables updated successfully');
+    } else {
+      console.log('⚠️ SendPulse update failed (but data saved in database)');
+    }
+    
+    // Отправка сообщения в Telegram (не критично если не получится)
     console.log('🔄 Sending success message...');
     await sendSuccessMessage(telegramId, discordUsername);
     
