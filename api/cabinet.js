@@ -3,7 +3,7 @@ import { getDiscordUsername, createState } from './db.js';
 
 const DISCORD_CLIENT_ID = '1455322635859791892';
 
-export default function handler(req, res) {
+export default async function handler(req, res) {
   const telegramId = req.query.telegram_id;
   const baseUrl = `https://${req.headers.host}`;
   const redirectUri = `${baseUrl}/discord/callback`;
@@ -50,7 +50,8 @@ export default function handler(req, res) {
     `);
   }
   
-  const discordUsername = getDiscordUsername(telegramId);
+  // ВАЖНО: await для получения username!
+  const discordUsername = await getDiscordUsername(telegramId);
   
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   
@@ -155,7 +156,7 @@ export default function handler(req, res) {
   } else {
     // Discord не привязан
     const state = randomBytes(32).toString('hex');
-    createState(telegramId, state);
+    await createState(telegramId, state);
     
     const oauthUrl = `https://discord.com/oauth2/authorize?` +
       `client_id=${DISCORD_CLIENT_ID}&` +
