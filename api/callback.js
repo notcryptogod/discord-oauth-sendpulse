@@ -33,8 +33,8 @@ async function updateSendPulseVariables(telegramId, discordUsername, discordId) 
       return false;
     }
 
-    // Используем правильный endpoint для обновления переменных
-    const response = await axios.post(
+    // Обновляем discord_username
+    const response1 = await axios.post(
       `https://api.sendpulse.com/telegram/contacts/setVariable`,
       {
         contact_id: parseInt(telegramId),
@@ -50,7 +50,7 @@ async function updateSendPulseVariables(telegramId, discordUsername, discordId) 
       }
     );
 
-    console.log('✅ discord_username updated:', response.data);
+    console.log('✅ discord_username updated:', response1.data);
 
     // Обновляем discord_id
     await axios.post(
@@ -93,40 +93,6 @@ async function updateSendPulseVariables(telegramId, discordUsername, discordId) 
     return true;
   } catch (error) {
     console.error('❌ SendPulse update error:', error.response?.data || error.message);
-    return false;
-  }
-}
-
-// Отправить сообщение пользователю через SendPulse
-async function sendSuccessMessage(telegramId, discordUsername) {
-  try {
-    const token = await getSendPulseToken();
-    if (!token) {
-      console.error('Failed to get SendPulse token');
-      return false;
-    }
-
-    // Используем правильный endpoint для отправки сообщений
-    const response = await axios.post(
-      `https://api.sendpulse.com/telegram/contacts/send`,
-      {
-        contact_id: parseInt(telegramId),
-        bot_id: SENDPULSE_BOT_ID,
-        message_text: `✅ Discord успешно привязан!\n\n🎮 Ваш Discord: ${discordUsername}\n\nТеперь вы можете перейти в личный кабинет и продолжить работу с ботом.`
-      },
-      {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      }
-    );
-
-    console.log('✅ Success message sent:', response.data);
-    return true;
-  } catch (error) {
-    console.error('❌ Send message error:', error.response?.data || error.message);
-    // Продолжаем даже если отправка сообщения не удалась
     return false;
   }
 }
@@ -201,10 +167,6 @@ export default async function handler(req, res) {
       console.log('⚠️ SendPulse update failed (but data saved in database)');
     }
     
-    // Отправка сообщения в Telegram (не критично если не получится)
-    console.log('🔄 Sending success message...');
-    await sendSuccessMessage(telegramId, discordUsername);
-    
     // Ваш лендинг с редиректом
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.status(200).send(successLandingPage(discordUsername));
@@ -242,7 +204,6 @@ function successLandingPage(discordUsername) {
     max-width:520px;
     transform: translateY(-20px);
   ">
-    <!-- SVG галочка -->
     <svg width="70" height="55" viewBox="0 0 180 140" fill="none"
          xmlns="http://www.w3.org/2000/svg"
          style="margin-bottom:18px;"
