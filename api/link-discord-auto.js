@@ -75,14 +75,19 @@ export default async function handler(req, res) {
   await cleanupOldStates();
   
   const state = randomBytes(32).toString('hex');
+  
+  // ВАЖНО: Сохраняем state с telegramId для использования позже
   await createState(contactId, state);
+  
+  // Сохраняем telegram_id отдельно для использования в callback
+  const stateData = `${state}:${telegramId}`;
   
   const oauthUrl = `https://discord.com/oauth2/authorize?` +
     `client_id=${DISCORD_CLIENT_ID}&` +
     `redirect_uri=${encodeURIComponent(redirectUri)}&` +
     `response_type=code&` +
     `scope=identify&` +
-    `state=${state}`;
+    `state=${encodeURIComponent(stateData)}`;
   
   res.redirect(302, oauthUrl);
 }
