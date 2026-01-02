@@ -129,7 +129,15 @@ export default async function handler(req, res) {
     return res.status(400).send(errorPage('Отсутствует код или state токен'));
   }
   
-  const contactId = await getContactIdByState(state);
+  // Извлекаем state и telegram_id (если есть)
+  let actualState = state;
+  let telegramId = null;
+  
+  if (state.includes(':')) {
+    [actualState, telegramId] = state.split(':');
+  }
+  
+  const contactId = await getContactIdByState(actualState);
   
   if (!contactId) {
     console.error('State lookup failed');
@@ -138,6 +146,9 @@ export default async function handler(req, res) {
   }
   
   console.log('✅ State valid for contact_id:', contactId);
+  if (telegramId) {
+    console.log('✅ Telegram ID:', telegramId);
+  }
   
   let discordUsername = '';
   
@@ -172,7 +183,7 @@ export default async function handler(req, res) {
     console.log('✅ User data received:', discordUsername);
     
     console.log('🔄 Saving to database...');
-    await saveDiscordData(contactId, discordUsername, discordId);
+    await saveDiscordData(contactId, discordUsername, discordId, telegramId);
     console.log('✅ Data saved to database');
     
     console.log('🔄 Updating SendPulse variables...');
